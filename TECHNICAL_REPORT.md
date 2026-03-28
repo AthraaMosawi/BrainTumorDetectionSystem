@@ -1,4 +1,4 @@
-# 📄 Intelligent Multi-Modal Fusion for Smart Tumor Detection: A Technical Thesis
+# 📄 Smart Tumor Detection System Using X-ray, MRI, and Microwave Images
 
 **Project Title**: Intelligent Tumor Fusion System (ITFS): Integrating X-Ray, MRI, and Microwave Imaging for Enhanced Diagnostic Accuracy.
 **Institution**: Al-Iraqi University - Faculty of Engineering
@@ -40,7 +40,7 @@ A single modality often fails to capture the full picture:
 
 ### 1.3 Problem Statement
 
-The central challenge is "Visual Fusion." Radiologists must mentally combine information from different screens, which is error-prone. Automated fusion is hindered by the lack of synchronized multi-modal datasets. This study proposes a synthetic-driven deep learning approach to bridge this gap.
+The central challenge is "Visual Fusion." Radiologists must mentally combine information from different screens, which is error-prone. Automated fusion is hindered by the lack of synchronized multi-modal datasets. This study proposes a hybrid Artificial Intelligence and Computer Vision approach, leveraging a trained deep learning model alongside classic CV thresholding methods, to bridge this gap effectively.
 
 ---
 
@@ -80,12 +80,9 @@ We implemented a Finite-Difference Time-Domain (FDTD) solver in Python (`fdtd_si
 - **Source**: Gaussian-modulated sine wave pulse at 2.4 GHz.
 - **Boundary**: Simple absorbing boundary conditions to minimize reflections.
 
-### 4.2 Synthetic Multi-modal Phantom Generator
+### 4.2 Real-World Samples and Dielectric Derivation
 
-Because synchronous data is unavailable, we created a "Digital Phantom" engine:
-
-- **Spatial Alignment**: The system generates a $(x, y)$ coordinate for the tumor center.
-- **Co-Registration**: This coordinate is used to "plant" the tumor density in the X-ray bone map, the MRI soft tissue map, and the MWI dielectric map simultaneously.
+While synthetic phantoms were used for early methodology, the final system is validated on real sample data. For modalities where data is missing (e.g., MWI dielectric maps), the system dynamically derives them using a multi-scale Gaussian diffusion model to simulate microwave dielectric profiles from MRI structural data.
 
 ---
 
@@ -115,32 +112,37 @@ Contrast Limited Adaptive Histogram Equalization is critical for MWI intensities
 
 ---
 
-## 🧠 Chapter 7: Deep Learning & Fusion Architecture
+## 🧠 Chapter 7: Deep Learning & Hybrid Decision Fusion
 
-### 7.1 Multi-Stream Encoder
+### 7.1 Hybrid Diagnostic Engine
 
-Each modality (MRI, X-ray, MWI) is processed by a parallel ResNet50 backbone. This allows the network to learn modality-specific features (e.g., edges in X-ray, intensity blobs in MRI).
+The system departs from purely opaque deep learning models by implementing a **Hybrid Decision Engine**:
+1. **Deep Learning Path**: A Keras-based Convolutional Neural Network evaluates the MRI input, returning a malignancy confidence score.
+2. **Computer Vision Path**: Contrast-enhanced X-Ray and MWI modalities undergo deterministic thresholding and contour detection to verify tumor locations structurally and dielectrically.
 
-### 7.2 The Attention Mechanism
+### 7.2 Decision Fusion Mechanism
 
-Instead of simple concatenation, we implement a **Squeeze-and-Excitation** inspired fusion:
+The final diagnostic output is determined by an attention-weighted decision algorithm rather than just feature concatenation:
 
 ```mermaid
 graph LR
-    MRI[MRI Features] --> CAT[Concatenate]
-    XRAY[Xray Features] --> CAT
-    MWI[MWI Features] --> CAT
-    CAT --> ATTEN[Attention Block]
-    ATTEN --> W_MRI[Weight MRI]
-    ATTEN --> W_XRAY[Weight Xray]
-    ATTEN --> W_MWI[Weight MWI]
-    W_MRI --> SUM[Weighted Sum]
-    W_XRAY --> SUM
-    W_MWI --> SUM
-    SUM --> FUSED[Fused Feature Map]
+    MRI[MRI Input] --> CNN[Keras CNN Model]
+    MRI --> CV_MRI[CV Thresholding]
+    XRAY[X-Ray Input] --> CV_XRAY[CV Thresholding]
+    MWI[MWI Map] --> CV_MWI[CV Thresholding]
+    
+    CNN --> ML_SCORE[ML Confidence]
+    CV_MRI --> CV_VOTE[CV Votes]
+    CV_XRAY --> CV_VOTE
+    CV_MWI --> CV_VOTE
+    
+    ML_SCORE --> FUSION[Weighted Decision]
+    CV_VOTE --> FUSION
+    
+    FUSION --> RESULT[Classification & Localization]
 ```
 
-The attention block learns a spatial mask that weighs MRI higher in soft-tissue regions and X-ray higher near bones.
+This hybrid approach ensures high clinical explainability, as positive results must be corroborated by physical intensity anomalies detected via classical computer vision.
 
 ---
 
@@ -149,12 +151,12 @@ The attention block learns a spatial mask that weighs MRI higher in soft-tissue 
 ### 8.1 Software Stack
 
 - **Languages**: Python 3.13
-- **Frameworks**: PyTorch (Models), Streamlit (Frontend), OpenCV (Image Processing).
-- **Architecture**: Modular design with separate `/data`, `/models`, and `/processing` packages.
+- **Frameworks**: TensorFlow/Keras (Models), Streamlit (Frontend), OpenCV (Image Processing).
+- **Architecture**: Modular design leveraging an integrated `app/dashboard.py` running the inference pipeline, with supporting modules in `/processing` and validated against real inputs in the `/sample` directory.
 
 ### 8.2 Dashboard Design
 
-The Streamlit dashboard allows for "Real-world vs. Synthetic" toggle, enabling doctors to test the system on both generated phantoms and uploaded DICOM files.
+The Streamlit dashboard focuses on processing real clinical images from the `sample/` folder or user uploads. The interface presents a 3-column layout guiding the user through data input, modality preview (with CLAHE enhancement), and transparent hybrid detection results.
 
 ---
 

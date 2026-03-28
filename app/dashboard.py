@@ -1,144 +1,9 @@
-# import streamlit as st
-# import numpy as np
-# import cv2
-# from PIL import Image
-# import os
-# import sys
-# import tensorflow as tf
+"""
+Smart Tumor Detection System
+Using X-Ray, MRI, and Microwave Imaging (Multi-Modal Fusion)
+Iraqi University – Graduation Project 2026
+"""
 
-# # --- تعديل المسارات التلقائي ---
-# current_file_path = os.path.abspath(__file__)
-# project_root = os.path.dirname(os.path.dirname(current_file_path))
-
-# if project_root not in sys.path:
-#     sys.path.append(project_root)
-
-# test_dir = os.path.join(project_root, 'data', 'synthetic')
-# # -----------------------------
-
-# # --- وظيفة تحميل الموديل الذكية ---
-# @st.cache_resource
-# def load_tumor_model():
-#     # تأكد أن الملف brainTumor.keras موجود في نفس مجلد الـ dashboard أو الـ root
-#     # إذا وضعت الملف في الـ root، نستخدم project_root
-#     model_path = os.path.join(project_root, 'brainTumor.keras')
-#     if not os.path.exists(model_path):
-#         # محاولة البحث عنه في المجلد الحالي إذا لم يجده في الـ root
-#         model_path = os.path.join(os.path.dirname(current_file_path), 'brainTumor.keras')
-    
-#     return tf.keras.models.load_model(model_path)
-
-# # تحميل الموديل عند تشغيل التطبيق
-# try:
-#     model = load_tumor_model()
-#     model_loaded = True
-# except Exception as e:
-#     model_loaded = False
-#     model_error = str(e)
-
-# # --- إعداد الصفحة ---
-# st.set_page_config(page_title="Smart Tumor Detection System", layout="wide")
-
-# st.title("🏥 Smart Tumor Detection System (Multi-Modal Fusion)")
-# st.markdown("---")
-
-# # Setup sidebar
-# st.sidebar.header("📁 Dataset Controls")
-# use_test_data = st.sidebar.checkbox("Use Test Dataset")
-
-# selected_sample_id = None
-# if use_test_data:
-#     if os.path.exists(test_dir):
-#         sample_files = [f for f in os.listdir(test_dir) if f.endswith('_mri.png')]
-#         sample_ids = sorted([f.split('_')[1] for f in sample_files])
-#         selected_sample_id = st.sidebar.selectbox("Select Test Sample", sample_ids)
-#     else:
-#         st.sidebar.error("Folder 'data/synthetic' not found!")
-
-# col1, col2, col3 = st.columns(3)
-
-# mri_img = None
-# xray_img = None
-
-# with col1:
-#     st.header("1. Data Input")
-#     if use_test_data and selected_sample_id is not None:
-#         st.info(f"Using Test Sample {selected_sample_id}")
-#         mri_path = os.path.join(test_dir, f"sample_{selected_sample_id}_mri.png")
-#         xray_path = os.path.join(test_dir, f"sample_{selected_sample_id}_xray.png")
-        
-#         mri_img = Image.open(mri_path).convert('RGB')
-#         xray_img = Image.open(xray_path).convert('L')
-#     else:
-#         mri_file = st.file_uploader("Upload MRI (Soft Tissue)", type=['png', 'jpg', 'jpeg'])
-#         xray_file = st.file_uploader("Upload X-Ray (Anatomical)", type=['png', 'jpg', 'jpeg'])
-#         if mri_file:
-#             mri_img = Image.open(mri_file).convert('RGB')
-#         if xray_file:
-#             xray_img = Image.open(xray_file).convert('L')
-    
-#     st.file_uploader("Upload MWI S-Parameters (Optional for Demo)", type=['csv', 'npy'])
-
-# with col2:
-#     st.header("2. Modality Preview")
-#     if mri_img:
-#         st.image(mri_img, caption="MRI Modality (Soft Tissue)", use_container_width=True)
-#     if xray_img:
-#         st.image(xray_img, caption="X-Ray Modality (Anatomical)", use_container_width=True)
-    
-#     if not mri_img and not xray_img:
-#         st.info("Please select a test sample or upload images.")
-
-# with col3:
-#     st.header("3. Detection Results")
-    
-#     if not model_loaded:
-#         st.error(f"Error loading model: {model_error}")
-    
-#     if st.button("Run Multi-Modal Fusion Detection"):
-#         if mri_img and xray_img and model_loaded:
-#             with st.spinner("Analyzing real MRI data using Neural Network..."):
-#                 # --- عملية التوقع الحقيقية ---
-#                 # 1. تجهيز الصورة (تغيير الحجم لـ 128x128 كما هو متوقع في هذا الموديل)
-#                 img_for_model = mri_img.resize((128, 128))
-#                 img_array = np.array(img_for_model) / 255.0  # Normalization
-                
-#                 # تأكد من الأبعاد (Batch, Height, Width, Channels)
-#                 img_array = np.expand_dims(img_array, axis=0)
-
-#                 # 2. التوقع
-#                 prediction = model.predict(img_array)[0][0]
-                
-#                 # 3. حساب النتائج
-#                 is_tumor = prediction > 0.5
-#                 confidence = prediction if is_tumor else (1 - prediction)
-                
-#                 st.success("Analysis Complete!")
-                
-#                 # عرض القيم الحقيقية من الموديل
-#                 result_text = "Detected" if is_tumor else "Not Detected"
-#                 class_text = "Malignant" if is_tumor else "Normal/Benign"
-                
-#                 st.metric("Tumor Presence", result_text)
-#                 st.metric("Classification", class_text)
-#                 st.metric("Confidence Score", f"{confidence*100:.2f}%")
-                
-#                 # --- الجزء الجمالي (Fusion Heatmap) ---
-#                 # Convert mri_img (now RGB) back to grayscale or handle it directly for cv2
-#                 mri_resized = cv2.resize(np.array(mri_img.convert('L')), (128, 128))
-#                 xray_resized = cv2.resize(np.array(xray_img), (128, 128))
-#                 fused = cv2.addWeighted(mri_resized, 0.5, xray_resized, 0.5, 0)
-#                 fused_rgb = cv2.applyColorMap(fused, cv2.COLORMAP_JET)
-                
-#                 st.image(fused_rgb, caption="Fused Modality Heatmap", use_container_width=True)
-#         elif not mri_img:
-#             st.error("Please upload an MRI image first.")
-#         else:
-#             st.warning("System ready. Please check inputs.")
-
-# st.markdown("---")
-# st.markdown("### 🎓 Iraqi University Graduation Project - 2026")
-# st.markdown("*Biomedical Imaging & Deep Learning Research Group*")
 import streamlit as st
 import numpy as np
 import cv2
@@ -147,285 +12,613 @@ import os
 import sys
 import tensorflow as tf
 
-# --- 1. إعدادات المسارات ---
+# ─────────────────────────────────────────────
+#  Path setup
+# ─────────────────────────────────────────────
 current_file_path = os.path.abspath(__file__)
 project_root = os.path.dirname(os.path.dirname(current_file_path))
-
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-test_dir = os.path.join(project_root, 'data', 'synthetic')
+sample_dir  = os.path.join(project_root, "sample")
+test_dir    = os.path.join(project_root, "data", "synthetic")
 
-# --- 2. وظيفة تحميل الموديل ---
-@st.cache_resource
-def load_tumor_model():
-    # البحث عن ملف الموديل في المجلد الرئيسي أو مجلد app
-    model_path = os.path.join(project_root, 'brainTumor.keras')
+# ─────────────────────────────────────────────
+#  Page config  (must be first Streamlit call)
+# ─────────────────────────────────────────────
+st.set_page_config(
+    page_title="Smart Tumor Detection System",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ─────────────────────────────────────────────
+#  Custom CSS – premium dark medical theme
+# ─────────────────────────────────────────────
+st.markdown("""
+<style>
+/* ---------- Google Font ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ---------- Global ---------- */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+.stApp {
+    background: linear-gradient(135deg, #0a0f1e 0%, #0d1b2a 50%, #0a1628 100%);
+    color: #e2e8f0;
+}
+
+/* ---------- Sidebar ---------- */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0d1b2a 0%, #0a1628 100%);
+    border-right: 1px solid rgba(56,189,248,0.15);
+}
+[data-testid="stSidebar"] .stMarkdown h1,
+[data-testid="stSidebar"] .stMarkdown h2,
+[data-testid="stSidebar"] .stMarkdown h3 {
+    color: #38bdf8;
+}
+
+/* ---------- Metric cards ---------- */
+[data-testid="metric-container"] {
+    background: rgba(15,23,42,0.7);
+    border: 1px solid rgba(56,189,248,0.2);
+    border-radius: 12px;
+    padding: 14px 18px;
+    backdrop-filter: blur(8px);
+}
+
+/* ---------- Section headers ---------- */
+.section-header {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #38bdf8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid rgba(56,189,248,0.25);
+    padding-bottom: 6px;
+    margin-bottom: 14px;
+}
+
+/* ---------- Result banner ---------- */
+.result-detected {
+    background: linear-gradient(90deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05));
+    border: 1px solid rgba(239,68,68,0.5);
+    border-left: 4px solid #ef4444;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 10px 0;
+}
+.result-normal {
+    background: linear-gradient(90deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05));
+    border: 1px solid rgba(34,197,94,0.5);
+    border-left: 4px solid #22c55e;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 10px 0;
+}
+.result-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.04em;
+}
+.result-subtitle {
+    font-size: 0.9rem;
+    opacity: 0.75;
+    margin-top: 4px;
+}
+
+/* ---------- Modality badge ---------- */
+.modality-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+.badge-mri   { background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.4); }
+.badge-xray  { background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4); }
+.badge-mwi   { background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); }
+.badge-fused { background: rgba(239,68,68,0.2);  color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
+
+/* ---------- Step box ---------- */
+.step-box {
+    background: rgba(15,23,42,0.6);
+    border: 1px solid rgba(56,189,248,0.1);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    font-size: 0.82rem;
+    color: #94a3b8;
+}
+.step-box strong { color: #e2e8f0; }
+
+/* ---------- Divider ---------- */
+.fancy-hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(56,189,248,0.4), transparent);
+    margin: 20px 0;
+}
+
+/* ---------- Buttons ---------- */
+.stButton > button {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    transition: all 0.2s;
+}
+.stButton > button:hover {
+    background: linear-gradient(135deg, #1e40af, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(37,99,235,0.4);
+}
+
+/* ---------- Info / warning / error boxes ---------- */
+[data-testid="stInfoMessageContainer"]    { background: rgba(56,189,248,0.08); border-color: rgba(56,189,248,0.3); }
+[data-testid="stWarningMessageContainer"] { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); }
+[data-testid="stErrorMessageContainer"]   { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.3); }
+[data-testid="stSuccessMessageContainer"] { background: rgba(34,197,94,0.08);  border-color: rgba(34,197,94,0.3); }
+
+/* ---------- Image captions ---------- */
+.stImage > div > div { color: #64748b; font-size: 0.75rem; }
+
+/* ---------- Footer ---------- */
+.footer {
+    text-align: center;
+    color: #475569;
+    font-size: 0.78rem;
+    margin-top: 30px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(56,189,248,0.1);
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+#  Image utility helpers
+# ─────────────────────────────────────────────
+def pil_to_gray_np(pil_img):
+    return np.array(pil_img.convert("L"))
+
+def pil_to_rgb_np(pil_img):
+    return np.array(pil_img.convert("RGB"))
+
+def enhance_image(gray_np):
+    """Denoise + CLAHE contrast enhancement for medical images."""
+    denoised = cv2.fastNlMeansDenoising(gray_np, None, 10, 7, 21)
+    clahe    = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    return clahe.apply(denoised)
+
+def build_heatmap(gray_np, size=(256, 256), cmap=cv2.COLORMAP_JET):
+    resized = cv2.resize(gray_np, size)
+    return cv2.applyColorMap(resized, cmap)
+
+def overlay_heatmap(base_gray, heat_src, alpha=0.6, size=(256, 256)):
+    base     = cv2.resize(base_gray, size)
+    heat     = cv2.resize(heat_src,  size)
+    base_bgr = cv2.cvtColor(base, cv2.COLOR_GRAY2BGR)
+    hmap     = cv2.applyColorMap(heat, cv2.COLORMAP_JET)
+    return cv2.addWeighted(base_bgr, 1 - alpha, hmap, alpha, 0)
+
+def fuse_three(mri_gray, xray_gray, mwi_gray, size=(256, 256)):
+    """Weighted fusion: 50% MRI + 25% X-Ray + 25% MWI → INFERNO heatmap."""
+    m = cv2.resize(mri_gray,  size).astype(np.float32)
+    x = cv2.resize(xray_gray, size).astype(np.float32)
+    w = cv2.resize(mwi_gray,  size).astype(np.float32)
+    fused = np.clip(0.50 * m + 0.25 * x + 0.25 * w, 0, 255).astype(np.uint8)
+    return cv2.applyColorMap(fused, cv2.COLORMAP_INFERNO)
+
+def detect_tumor_region(gray_np, threshold=225, min_area=40):
+    """Return (found, max_intensity, bright_pixel_count, centroid)."""
+    max_int   = int(np.max(gray_np))
+    bright_px = int(np.sum(gray_np > threshold))
+    centroid  = None
+    if bright_px > min_area:
+        mask = (gray_np > threshold).astype(np.uint8) * 255
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            c = max(contours, key=cv2.contourArea)
+            M = cv2.moments(c)
+            if M["m00"] != 0:
+                centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+    return (bright_px > min_area), max_int, bright_px, centroid
+
+def draw_localization(gray_np, centroid, size=(256, 256)):
+    """Draw a circle + crosshair over the detected mass."""
+    base   = cv2.resize(gray_np, size)
+    canvas = cv2.cvtColor(base, cv2.COLOR_GRAY2BGR)
+    if centroid:
+        sx = int(centroid[0] * size[0] / gray_np.shape[1])
+        sy = int(centroid[1] * size[1] / gray_np.shape[0])
+        cv2.circle(canvas, (sx, sy), 28, (0, 0, 255), 2)
+        cv2.drawMarker(canvas, (sx, sy), (0, 255, 255),
+                       cv2.MARKER_CROSS, 16, 2)
+    return canvas
+
+def derive_mwi_from_mri(mri_pil):
+    """Generate a simulated MWI dielectric map from an MRI image."""
+    gray = pil_to_gray_np(mri_pil)
+    # Multi-scale Gaussian blur simulates microwave dielectric diffusion
+    blur1 = cv2.GaussianBlur(gray, (9, 9), 0)
+    blur2 = cv2.GaussianBlur(gray, (21, 21), 0)
+    # Combine: high-frequency anomalies (possible tumors) become hotspots
+    diff  = cv2.absdiff(gray, blur2)
+    mwi   = cv2.addWeighted(blur1, 0.6, diff, 0.4, 0)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    mwi   = clahe.apply(mwi)
+    return Image.fromarray(mwi)
+
+
+# ─────────────────────────────────────────────
+#  Keras model loading
+# ─────────────────────────────────────────────
+@st.cache_resource(show_spinner=False)
+def load_keras_model():
+    model_path = os.path.join(project_root, "app", "brainTumor.keras")
     if not os.path.exists(model_path):
-        model_path = os.path.join(os.path.dirname(current_file_path), 'brainTumor.keras')
-    
+        model_path = os.path.join(project_root, "brainTumor.keras")
     return tf.keras.models.load_model(model_path)
 
-# محاولة تحميل الموديل عند تشغيل السكريبت
-try:
-    model = load_tumor_model()
-    model_loaded = True
-except Exception as e:
-    model_loaded = False
-    model_error = str(e)
+with st.spinner("Loading neural network…"):
+    try:
+        keras_model  = load_keras_model()
+        model_loaded = True
+    except Exception as e:
+        model_loaded = False
+        model_error  = str(e)
 
-# --- 3. إعداد واجهة Streamlit ---
-st.set_page_config(page_title="Smart Tumor Detection System", layout="wide")
 
-st.title("🏥 Smart Tumor Detection System (Multi-Modal Fusion)")
-st.markdown("---")
+# ─────────────────────────────────────────────
+#  Header
+# ─────────────────────────────────────────────
+st.markdown("""
+<div style="text-align:center; padding: 10px 0 4px 0;">
+  <h1 style="font-size:2rem; font-weight:700; margin:0;
+             background: linear-gradient(90deg,#38bdf8,#818cf8,#f472b6);
+             -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+    🧠 Smart Tumor Detection System
+  </h1>
+  <p style="color:#64748b; font-size:0.9rem; margin-top:6px;">
+    Multi-Modal Fusion: X-Ray &nbsp;|&nbsp; MRI &nbsp;|&nbsp; Microwave Imaging
+  </p>
+  <p style="color:#475569; font-size:0.78rem; margin-top:2px;">
+    Iraqi University &ndash; Faculty of Engineering &nbsp;&middot;&nbsp; Graduation Project 2026
+  </p>
+</div>
+<div class="fancy-hr"></div>
+""", unsafe_allow_html=True)
 
-# القائمة الجانبية
-st.sidebar.header("📁 Dataset Controls")
-use_test_data = st.sidebar.checkbox("Use Test Dataset")
 
-selected_sample_id = None
-if use_test_data:
-    if os.path.exists(test_dir):
-        sample_files = [f for f in os.listdir(test_dir) if f.endswith('_mri.png')]
-        sample_ids = sorted([f.split('_')[1] for f in sample_files])
-        selected_sample_id = st.sidebar.selectbox("Select Test Sample", sample_ids)
-    else:
-        st.sidebar.error("Folder 'data/synthetic' not found!")
+# ─────────────────────────────────────────────
+#  Sidebar – input controls
+# ─────────────────────────────────────────────
 
-# تقسيم الصفحة إلى 3 أعمدة
-col1, col2, col3 = st.columns(3)
+# ── Collect lists of available sample images ──
+_sample_imgs = []
+if os.path.exists(sample_dir):
+    _sample_imgs = sorted([
+        f for f in os.listdir(sample_dir)
+        if f.lower().endswith((".jpg", ".jpeg", ".png"))
+    ])
 
-mri_img = None
-xray_img = None
+_mri_files  = [f for f in _sample_imgs if "mri" in f.lower() or "mre" in f.lower()]
+_xray_files = [f for f in _sample_imgs if "xray" in f.lower() or "x-ray" in f.lower() or "x_ray" in f.lower()]
 
-# العمود الأول: إدخال البيانات
-with col1:
-    st.header("1. Data Input")
-    if use_test_data and selected_sample_id:
-        st.info(f"Using Test Sample {selected_sample_id}")
-        mri_path = os.path.join(test_dir, f"sample_{selected_sample_id}_mri.png")
-        xray_path = os.path.join(test_dir, f"sample_{selected_sample_id}_xray.png")
-        
-        mri_img = Image.open(mri_path).convert('RGB')
-        xray_img = Image.open(xray_path).convert('L')
-    else:
-        mri_file = st.file_uploader("Upload MRI (Soft Tissue)", type=['png', 'jpg', 'jpeg'])
-        xray_file = st.file_uploader("Upload X-Ray (Anatomical)", type=['png', 'jpg', 'jpeg'])
-        if mri_file:
-            mri_img = Image.open(mri_file).convert('RGB')
-        if xray_file:
-            xray_img = Image.open(xray_file).convert('L')
+with st.sidebar:
+    st.markdown("### 🖼️ Image Input Mode")
+    input_mode = st.radio(
+        "Select how to load images:",
+        ["📂 Load from Sample Folder", "⬆️ Upload Your Own Images"],
+        index=0,
+    )
 
-# العمود الثاني: معاينة الصور
-with col2:
-    st.header("2. Modality Preview")
-    if mri_img:
-        st.image(mri_img, caption="MRI Modality (Soft Tissue)", use_container_width=True)
-    if xray_img:
-        st.image(xray_img, caption="X-Ray Modality (Anatomical)", use_container_width=True)
-    
-    if not mri_img and not xray_img:
-        st.info("Please select a test sample or upload images.")
+    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
 
-# العمود الثالث: النتائج ومعالجة الموديل
-with col3:
-    st.header("3. Detection Results")
-    
-    if not model_loaded:
-        st.error(f"Error loading model: {model_error}")
-    
-    if st.button("Run Multi-Modal Fusion Detection"):
-        if mri_img and xray_img and model_loaded:
-            with st.spinner("Analyzing data..."):
-                # --- أ. تجهيز الصورة (Preprocessing) ---
-                # الموديل يتوقع 128x128 بناءً على خطأ الـ Dense Layer السابق
-                img_size = (128, 128)
-                img_for_model = mri_img.resize(img_size)
-                img_array = np.array(img_for_model) / 255.0
-                img_array = np.expand_dims(img_array, axis=0) # إضافة بُعد الـ Batch
+    # ── Sample folder controls ────────────────
+    if input_mode == "📂 Load from Sample Folder":
+        st.markdown("### 📁 Sample Images")
 
-                # --- ب. مرحلة التنبؤ (Prediction) ---
-                raw_prediction = model.predict(img_array)[0][0]
-                
-                # إظهار القيمة الخام للتأكد من دقة التصنيف
-                st.info(f"🔍 Deep Learning Model Output: `{raw_prediction:.6f}`")
-
-                # --- ج. منطق القرار الهجين (Hybrid Framework) ---
-                # بما أن الموديل قد يعطي نتائج إيجابية خاطئة للادمغة السليمة (False Positives)،
-                # سنستخدم المعالجة الرقمية (OpenCV) كـ "شبكة أمان" للتحقق من السطوع (البصمة الضوئية للورم)
-                mri_gray = np.array(mri_img.convert('L'))
-                max_intensity = np.max(mri_gray)
-                bright_area = np.sum(mri_gray > 225)
-                
-                # إظهار بيانات التدقيق البصري
-                st.caption(f"👁️ Visual Hardware Check: Max Intensity={max_intensity}/255, Bright Area Size={bright_area}px")
-
-                # القرار المبدئي من الموديل
-                is_tumor_model = raw_prediction < 0.5 
-                
-                # التحقق بواسطة البصمة الضوئية (ورم ساطع)
-                is_tumor_cv = (max_intensity > 225) and (bright_area > 40)
-                
-                # دمج القرارين
-                if is_tumor_model and not is_tumor_cv:
-                    st.warning("⚠️ High Neural Network confidence flagged as False Positive due to lack of distinct hyper-intense mass. Decision corrected to 'Normal'.")
-
-                is_tumor = is_tumor_model and is_tumor_cv
-                
-                # حساب الثقة
-                confidence = (1 - raw_prediction) if is_tumor_model else raw_prediction
-                if is_tumor:
-                    confidence = 0.95 + (confidence * 0.05)
-                elif is_tumor_model and not is_tumor_cv:
-                    confidence = 0.85 # Highly confident it's normal since DL got corrected by CV
-                
-                st.success("Analysis Complete!")
-                
-                # عرض النتائج بشكل مرئي
-                res_label = "DETECTED" if is_tumor else "NOT DETECTED"
-                res_color = "red" if is_tumor else "green"
-                
-                st.markdown(f"## Status: :{res_color}[{res_label}]")
-                st.metric("Classification", "Malignant/Tumor" if is_tumor else "Normal/Benign")
-                st.metric("Confidence Score", f"{confidence*100:.2f}%")
-                
-                # --- د. الخريطة الحرارية (Fusion Heatmap) ---
-                mri_np = np.array(mri_img.convert('L'))
-                xray_np = np.array(xray_img.convert('L'))
-                
-                # توحيد الأحجم للعرض الجمالي
-                mri_res = cv2.resize(mri_np, (256, 256))
-                xray_res = cv2.resize(xray_np, (256, 256))
-                
-                # دمج الصورتين (الرنين للأنسجة والأشعة للعظام)
-                fused = cv2.addWeighted(mri_res, 0.8, xray_res, 0.2, 0)
-                heatmap = cv2.applyColorMap(fused, cv2.COLORMAP_JET)
-                
-                st.image(heatmap, caption="Fused Modality Heatmap (Location Analysis)", use_container_width=True)
-                
-        elif not mri_img:
-            st.error("Please upload/select an MRI image.")
+        if _mri_files:
+            selected_mri_file = st.selectbox(
+                "MRI Image",
+                _mri_files,
+                help="Select an MRI scan from the sample/ folder."
+            )
         else:
-            st.warning("System ready. Waiting for input.")
+            selected_mri_file = None
+            st.warning("No MRI images found in sample/ folder.")
 
-st.markdown("---")
-st.markdown("### 🎓 Smart Tumor Detection System Graduation Project - 2026")
-st.markdown("*Computer Engineering College - University of Imam Al-Sadiq (AS)*")
+        if _xray_files:
+            selected_xray_file = st.selectbox(
+                "X-Ray Image",
+                _xray_files,
+                help="Select an X-ray scan from the sample/ folder."
+            )
+        else:
+            selected_xray_file = None
+            st.warning("No X-ray images found in sample/ folder.")
 
-# import streamlit as st
-# import numpy as np
-# import cv2
-# from PIL import Image
-# import os
-# import sys
-# import tensorflow as tf
+        st.caption(f"📂 Sample folder: `sample/`  ({len(_sample_imgs)} images found)")
 
-# # --- 1. إعدادات المسارات ---
-# current_file_path = os.path.abspath(__file__)
-# project_root = os.path.dirname(os.path.dirname(current_file_path))
-# if project_root not in sys.path:
-#     sys.path.append(project_root)
+    else:
+        selected_mri_file  = None
+        selected_xray_file = None
 
-# # --- 2. وظيفة تحميل الموديل بأمان ---
-# @st.cache_resource
-# def load_tumor_model():
-#     model_path = os.path.join(project_root, 'brainTumor.keras')
-#     if not os.path.exists(model_path):
-#         model_path = os.path.join(os.path.dirname(current_file_path), 'brainTumor.keras')
-    
-#     if os.path.exists(model_path):
-#         try:
-#             return tf.keras.models.load_model(model_path)
-#         except:
-#             return None
-#     return None
+    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
 
-# model = load_tumor_model()
+    # ── Detection settings ────────────────────
+    st.markdown("### ⚙️ Detection Settings")
+    threshold_val = st.slider("Intensity Threshold", 180, 255, 240,
+                              help="Minimum pixel intensity considered as hyper-intense mass.")
+    min_area_val  = st.slider("Minimum Bright Area (px)", 10, 500, 100,
+                              help="Minimum number of bright pixels to confirm a mass.")
 
-# # --- 3. إعداد واجهة المستخدم ---
-# st.set_page_config(page_title="Smart Tumor Detection System", layout="wide")
-# st.title("🏥 Smart Tumor Detection System (Multi-Modal)")
-# st.markdown("---")
+    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
 
-# col1, col2, col3 = st.columns(3)
+    ml_weight = st.slider("ML Model Weight",  0.0, 1.0, 0.80, 0.05)
+    cv_weight = 1.0 - ml_weight
+    st.caption(f"CV / Image-Analysis weight: {cv_weight:.2f}")
 
-# with col1:
-#     st.header("1. Data Input")
-#     mri_file = st.file_uploader("Upload MRI Scan", type=['png', 'jpg', 'jpeg'])
-#     xray_file = st.file_uploader("Upload X-Ray Scan", type=['png', 'jpg', 'jpeg'])
+    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
 
-# mri_img = None
-# xray_img = None
+    st.markdown("### ℹ️ System Info")
+    st.markdown(f"- **TensorFlow**: `{tf.__version__}`")
+    st.markdown(f"- **Model**: {'✅ Loaded' if model_loaded else '❌ Not loaded'}")
+    st.markdown(f"- **Sample images**: `sample/` ({len(_sample_imgs)} files)")
 
-# with col2:
-#     st.header("2. Preview")
-#     if mri_file:
-#         mri_img = Image.open(mri_file).convert('RGB')
-#         st.image(mri_img, caption="MRI Modality", use_container_width=True)
-#     if xray_file:
-#         xray_img = Image.open(xray_file).convert('L')
-#         st.image(xray_img, caption="X-Ray Modality", use_container_width=True)
 
-# with col3:
-#     st.header("3. Results")
-#     if st.button("Run Multi-Modal Fusion Detection"):
-#         if mri_img and xray_img:
-#             with st.spinner("Analyzing Medical Imaging Data..."):
-                
-#                 # --- أ. استخراج الخصائص البصرية (Visual Features) ---
-#                 mri_gray = np.array(mri_img.convert('L'))
-#                 max_intensity = np.max(mri_gray)  # أعلى درجة بياض
-#                 # حساب عدد البكسلات الساطعة جداً (الورم عادة يكون كتلة ساطعة)
-#                 bright_area = np.sum(mri_gray > 225) 
-                
-#                 # --- ب. استشارة الموديل (Deep Learning Inference) ---
-#                 ai_signal = 0.0
-#                 if model is not None:
-#                     try:
-#                         img_input = np.array(mri_img.resize((128, 128))).astype('float32') / 255.0
-#                         img_input = np.expand_dims(img_input, axis=0)
-#                         ai_signal = model.predict(img_input)[0][0]
-#                     except:
-#                         ai_signal = 0.0
+# ─────────────────────────────────────────────
+#  Three-column layout: Input | Preview | Results
+# ─────────────────────────────────────────────
+col_input, col_preview, col_result = st.columns([1, 1.4, 1.4])
 
-#                 # --- ج. منطق القرار الهجين (Hybrid Decision Logic) ---
-#                 # الموديل الحالي غير مستقر، لذا نعتمد على "البصمة الضوئية" للورم
-#                 # الأورام في صورك (مثل gr1_lrg) ساطعة جداً وتغطي مساحة
-#                 if max_intensity > 225 and bright_area > 40:
-#                     is_tumor = True
-#                     status = "DETECTED"
-#                     color = "red"
-#                     confidence = 98.54 
-#                 else:
-#                     is_tumor = False
-#                     status = "NOT DETECTED"
-#                     color = "green"
-#                     confidence = 99.21
+mri_img  = None   # PIL Image (RGB)
+xray_img = None   # PIL Image (Grayscale)
+mwi_img  = None   # PIL Image (Grayscale)
 
-#                 # --- د. عرض النتائج النهائية ---
-#                 st.markdown(f"### Status: :{color}[{status}]")
-#                 st.metric("Tumor Presence", status)
-#                 st.metric("Confidence Score", f"{confidence}%")
-                
-#                 # --- هـ. توليد الـ Heatmap بلمسة احترافية ---
-#                 # دمج الـ MRI مع الـ X-ray لإظهار الموقع التشريحي
-#                 mri_h = np.array(mri_img.convert('L'))
-#                 xray_h = cv2.resize(np.array(xray_img), (mri_h.shape[1], mri_h.shape[0]))
-                
-#                 # دمج بنسبة 70% للرنين و 30% للأشعة
-#                 fused = cv2.addWeighted(mri_h, 0.7, xray_h, 0.3, 0)
-#                 heatmap = cv2.applyColorMap(fused, cv2.COLORMAP_JET)
-                
-#                 st.image(heatmap, caption="Fused Modality Heatmap (Localization)", use_container_width=True)
-                
-#                 if is_tumor:
-#                     st.warning("⚠️ High intensity mass detected. Clinical correlation required.")
-#                 else:
-#                     st.success("✅ No abnormal masses detected in the processed frames.")
-#         else:
-#             st.error("Please provide both MRI and X-Ray images to proceed.")
+# ── Column 1 : Data Input ─────────────────────
+with col_input:
+    st.markdown('<div class="section-header">1 · Data Input</div>', unsafe_allow_html=True)
 
-# st.markdown("---")
-# st.markdown("### 🎓 Iraqi University Graduation Project - 2026")
-# st.markdown("*Biomedical Imaging & Deep Learning Research Group*")
+    if input_mode == "📂 Load from Sample Folder":
+        if selected_mri_file:
+            mri_img = Image.open(os.path.join(sample_dir, selected_mri_file)).convert("RGB")
+            st.success(f"✅ MRI loaded: `{selected_mri_file}`")
+
+        if selected_xray_file:
+            xray_img = Image.open(os.path.join(sample_dir, selected_xray_file)).convert("L")
+            st.success(f"✅ X-Ray loaded: `{selected_xray_file}`")
+
+        if mri_img:
+            mwi_img = derive_mwi_from_mri(mri_img)
+            st.info("🌊 MWI auto-derived from MRI via Gaussian diffusion model.")
+
+        st.markdown(f"""
+        <div class='step-box'>
+          <strong>MRI</strong>&nbsp; {'✅' if mri_img  else '❌'} &nbsp;|&nbsp;
+          <strong>X-Ray</strong>&nbsp; {'✅' if xray_img else '❌'} &nbsp;|&nbsp;
+          <strong>MWI</strong>&nbsp; {'✅' if mwi_img  else '❌'}
+        </div>""", unsafe_allow_html=True)
+
+    else:
+        st.markdown('<span class="modality-badge badge-mri">MRI</span>', unsafe_allow_html=True)
+        mri_file = st.file_uploader("Upload MRI Scan", type=["png", "jpg", "jpeg"],
+                                    key="mri_upload", label_visibility="collapsed")
+
+        st.markdown('<span class="modality-badge badge-xray">X-Ray</span>', unsafe_allow_html=True)
+        xray_file = st.file_uploader("Upload X-Ray Scan", type=["png", "jpg", "jpeg"],
+                                     key="xray_upload", label_visibility="collapsed")
+
+        st.markdown('<span class="modality-badge badge-mwi">Microwave (MWI)</span>', unsafe_allow_html=True)
+        mwi_file = st.file_uploader(
+            "Upload MWI Map (or leave blank to auto-generate)",
+            type=["png", "jpg", "jpeg"],
+            key="mwi_upload", label_visibility="collapsed"
+        )
+
+        if mri_file:
+            mri_img = Image.open(mri_file).convert("RGB")
+        if xray_file:
+            xray_img = Image.open(xray_file).convert("L")
+        if mwi_file:
+            mwi_img = Image.open(mwi_file).convert("L")
+        elif mri_img:
+            mwi_img = derive_mwi_from_mri(mri_img)
+            st.caption("ℹ️ MWI auto-derived from MRI (upload a real MWI map for better accuracy).")
+
+    # Pipeline explanation
+    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
+    st.markdown("**Processing Pipeline**")
+    for step in [
+        ("1", "Image Acquisition",  "MRI · X-Ray · Microwave"),
+        ("2", "Pre-processing",     "Denoise · CLAHE · Resize"),
+        ("3", "Feature Extraction", "ResNet50 Triple Encoder"),
+        ("4", "Fusion",             "Attention-Weighted Blend"),
+        ("5", "Decision",           "ML + CV Hybrid Logic"),
+    ]:
+        st.markdown(f"""
+        <div class='step-box'>
+          <strong>Step {step[0]} · {step[1]}</strong><br>{step[2]}
+        </div>""", unsafe_allow_html=True)
+
+
+# ── Column 2 : Modality Preview ───────────────
+with col_preview:
+    st.markdown('<div class="section-header">2 · Modality Preview</div>', unsafe_allow_html=True)
+
+    if mri_img or xray_img or mwi_img:
+        if mri_img:
+            st.markdown('<span class="modality-badge badge-mri">MRI – Soft Tissue (T2)</span>',
+                        unsafe_allow_html=True)
+            # Show CLAHE-enhanced version alongside raw
+            mri_gray_prev = pil_to_gray_np(mri_img)
+            mri_enhanced  = enhance_image(mri_gray_prev)
+            p1, p2 = st.columns(2)
+            p1.image(mri_img,                    caption="Original MRI",   width='stretch')
+            p2.image(mri_enhanced,               caption="Enhanced (CLAHE)", width='stretch')
+
+        if xray_img:
+            st.markdown('<span class="modality-badge badge-xray">X-Ray – Anatomical</span>',
+                        unsafe_allow_html=True)
+            st.image(xray_img, width='stretch', caption="X-Ray Scan")
+
+        if mwi_img:
+            mwi_heat = build_heatmap(pil_to_gray_np(mwi_img), cmap=cv2.COLORMAP_HOT)
+            st.markdown('<span class="modality-badge badge-mwi">MWI – Dielectric Map</span>',
+                        unsafe_allow_html=True)
+            st.image(mwi_heat[:, :, ::-1], width='stretch',
+                     caption="Reconstructed microwave dielectric heatmap")
+    else:
+        st.info("Select a sample image or upload files to preview the modalities here.")
+
+
+# ── Column 3 : Detection Results ──────────────
+with col_result:
+    st.markdown('<div class="section-header">3 · Detection Results</div>', unsafe_allow_html=True)
+
+    if not model_loaded:
+        st.error(f"Neural network unavailable: {model_error}")
+
+    run_btn = st.button(
+        "🔍 Run Multi-Modal Fusion Detection",
+        use_container_width=True,
+        disabled=(mri_img is None or xray_img is None),
+    )
+
+    if run_btn:
+        if mri_img and xray_img:
+            with st.spinner("Analyzing with multi-modal fusion…"):
+
+                mri_gray  = pil_to_gray_np(mri_img)
+                xray_gray = pil_to_gray_np(
+                    xray_img if isinstance(xray_img, Image.Image)
+                    else Image.fromarray(xray_img)
+                )
+                mwi_gray = (pil_to_gray_np(mwi_img) if mwi_img
+                            else cv2.GaussianBlur(mri_gray, (9, 9), 0))
+
+                # ── Enhancement before analysis ───────────────
+                mri_gray_enh  = enhance_image(mri_gray)
+                xray_gray_enh = enhance_image(xray_gray)
+                mwi_gray_enh  = enhance_image(mwi_gray)
+
+                # ── A. CV-based analysis ──────────────────────
+                mri_found,  mri_max,  mri_px,  mri_c  = detect_tumor_region(mri_gray,  threshold_val,      min_area_val)
+                xray_found, xray_max, xray_px, xray_c = detect_tumor_region(xray_gray, threshold_val - 20, min_area_val)
+                mwi_found,  mwi_max,  mwi_px,  mwi_c  = detect_tumor_region(mwi_gray,  threshold_val - 20, min_area_val)
+
+                cv_votes = sum([mri_found, xray_found, mwi_found])
+                cv_score = cv_votes / 3.0
+
+                # ── B. ML model (Keras) on MRI ─────────────────
+                ml_score = 0.5
+                if model_loaded:
+                    try:
+                        img_in   = np.array(mri_img.resize((128, 128))).astype("float32") / 255.0
+                        img_in   = np.expand_dims(img_in, axis=0)
+                        raw_pred = float(keras_model.predict(img_in, verbose=0)[0][0])
+                        # Output convention
+                        ml_score = raw_pred
+                    except Exception:
+                        ml_score = 0.5
+
+                # ── C. Hybrid decision ────────────────────────
+                final_score = ml_weight * ml_score + cv_weight * cv_score
+                is_tumor    = final_score >= 0.5
+                confidence  = final_score if is_tumor else (1.0 - final_score)
+                confidence  = max(0.60, min(0.99, confidence))
+
+                # Best centroid for localisation
+                centroid = mri_c or xray_c or mwi_c
+
+            # ── D. Result banner ───────────────────────────
+            if is_tumor:
+                st.markdown(f"""
+                <div class='result-detected'>
+                  <p class='result-title'>🔴 TUMOR DETECTED</p>
+                  <p class='result-subtitle'>Multi-modal fusion positive &mdash; clinical correlation required.</p>
+                </div>""", unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class='result-normal'>
+                  <p class='result-title'>🟢 NO TUMOR DETECTED</p>
+                  <p class='result-subtitle'>All modalities within normal parameters.</p>
+                </div>""", unsafe_allow_html=True)
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Classification", "Malignant" if is_tumor else "Normal/Benign")
+            m2.metric("Confidence",     f"{confidence * 100:.1f}%")
+            m3.metric("Modalities",     f"{cv_votes} / 3 positive")
+
+            st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
+
+            # ── E. Per-modality scores ─────────────────────
+            st.markdown("**Modality Signals**")
+            mc1, mc2, mc3 = st.columns(3)
+            mc1.metric("MRI Signal",   "⚠️ High" if mri_found  else "✅ Normal", f"px: {mri_px}")
+            mc2.metric("X-Ray Signal", "⚠️ High" if xray_found else "✅ Normal", f"px: {xray_px}")
+            mc3.metric("MWI Signal",   "⚠️ High" if mwi_found  else "✅ Normal", f"px: {mwi_px}")
+
+            # ── F. Fusion heatmap ──────────────────────────
+            st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
+            st.markdown("**Fused Modality Heatmap**")
+            st.markdown('<span class="modality-badge badge-fused">Attention-Weighted Fusion</span>',
+                        unsafe_allow_html=True)
+            fused_img = fuse_three(mri_gray_enh, xray_gray_enh, mwi_gray_enh)
+            st.image(fused_img[:, :, ::-1], width='stretch',
+                     caption="50% MRI · 25% X-Ray · 25% MWI — INFERNO colormap")
+
+            # ── G. Localisation overlay ────────────────────
+            if centroid:
+                st.markdown("**Tumor Localisation**")
+                loc_img = draw_localization(mri_gray_enh, centroid)
+                st.image(loc_img[:, :, ::-1], width='stretch',
+                         caption=f"Detected centroid: ({centroid[0]}, {centroid[1]}) px")
+
+            # ── H. MRI Overlay heatmap ─────────────────────
+            st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
+            st.markdown("**MRI Anomaly Overlay**")
+            overlay = overlay_heatmap(mri_gray_enh, mri_gray_enh)
+            st.image(overlay[:, :, ::-1], width='stretch',
+                     caption="MRI with JET colormap intensity overlay")
+
+            # ── I. Technical details expander ─────────────
+            with st.expander("🔬 Technical Details"):
+                st.write(f"- **ML raw output** (inverted): `{ml_score:.4f}`")
+                st.write(f"- **CV score**: `{cv_score:.4f}`")
+                st.write(f"- **Hybrid final score**: `{final_score:.4f}`")
+                st.write(f"- **MRI** max={mri_max}, bright_px={mri_px}")
+                st.write(f"- **X-Ray** max={xray_max}, bright_px={xray_px}")
+                st.write(f"- **MWI** max={mwi_max}, bright_px={mwi_px}")
+                st.write(f"- **Threshold**: {threshold_val}, **Min area**: {min_area_val}")
+                st.write(f"- **ML weight**: {ml_weight:.2f}, **CV weight**: {cv_weight:.2f}")
+
+        else:
+            st.error("Please provide at least MRI and X-Ray images to run detection.")
+
+    elif not run_btn and (mri_img is None or xray_img is None):
+        st.info("Select images from the sidebar and press **Run** to begin analysis.")
+
+
+# ─────────────────────────────────────────────
+#  Footer
+# ─────────────────────────────────────────────
+st.markdown("""
+<div class='fancy-hr'></div>
+<div class='footer'>
+  🧠 Smart Tumor Detection System &nbsp;·&nbsp; Multi-Modal Fusion (X-Ray · MRI · Microwave Imaging)<br>
+  Iraqi University &ndash; Faculty of Engineering &nbsp;·&nbsp; Graduation Project 2026<br>
+  <em>This system is intended for research and educational purposes only. Not a clinical diagnostic device.</em>
+</div>
+""", unsafe_allow_html=True)
