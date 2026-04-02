@@ -355,27 +355,11 @@ with st.sidebar:
         selected_mri_file  = None
         selected_xray_file = None
 
-    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
-
-    # ── Detection settings ────────────────────
-    st.markdown("### ⚙️ Detection Settings")
-    threshold_val = st.slider("Intensity Threshold", 180, 255, 240,
-                              help="Minimum pixel intensity considered as hyper-intense mass.")
-    min_area_val  = st.slider("Minimum Bright Area (px)", 10, 500, 100,
-                              help="Minimum number of bright pixels to confirm a mass.")
-
-    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
-
-    ml_weight = st.slider("ML Model Weight",  0.0, 1.0, 0.80, 0.05)
-    cv_weight = 1.0 - ml_weight
-    st.caption(f"CV / Image-Analysis weight: {cv_weight:.2f}")
-
-    st.markdown("<div class='fancy-hr'></div>", unsafe_allow_html=True)
-
-    st.markdown("### ℹ️ System Info")
-    st.markdown(f"- **TensorFlow**: `{tf.__version__}`")
-    st.markdown(f"- **Model**: {'✅ Loaded' if model_loaded else '❌ Not loaded'}")
-    st.markdown(f"- **Sample images**: `sample/` ({len(_sample_imgs)} files)")
+    # Default detection settings
+    threshold_val = 200
+    min_area_val  = 100
+    ml_weight     = 0.80
+    cv_weight     = 1.0 - ml_weight
 
 
 # ─────────────────────────────────────────────
@@ -528,8 +512,8 @@ with col_result:
                         img_in   = np.array(mri_img.resize((128, 128))).astype("float32") / 255.0
                         img_in   = np.expand_dims(img_in, axis=0)
                         raw_pred = float(keras_model.predict(img_in, verbose=0)[0][0])
-                        # Output convention
-                        ml_score = raw_pred
+                        # Output convention (invert so 1.0 = tumor)
+                        ml_score = 1.0 - raw_pred
                     except Exception:
                         ml_score = 0.5
 
