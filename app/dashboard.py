@@ -227,11 +227,10 @@ def detect_tumor_region(gray_np, fallback_threshold=150, min_area=40):
     blurred = cv2.GaussianBlur(gray_np, (5, 5), 0)
     
     # Calculate dynamic threshold using Otsu's Method
-    otsu_val, _ = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    final_threshold = max(otsu_val, fallback_threshold)
+    # Fallback threshold is ignored because Otsu provides an exact threshold, but kept for signature compatibility
+    _, mask = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     
     # Apply mask and count bright pixels
-    _, mask = cv2.threshold(blurred, final_threshold, 255, cv2.THRESH_BINARY)
     bright_px = int(cv2.countNonZero(mask))
     
     centroid = None
@@ -520,49 +519,77 @@ with col_result:
                 cv_score = cv_votes / 3.0
 
                 # ── B. ML model (Keras) on MRI ─────────────────
-        # ── B. ML model (Keras) on MRI ─────────────────
-                ml_score = 0.5
+                # ── B. ML model (Keras) on MRI ─────────────────
+                ml_score = 0.0
+                ml_prediction_text = "Unknown"
                 if model_loaded:
                     try:
-                        # 1. Convert to RGB to satisfy the model's 3-channel requirement
+                        # 1. Convert grayscale image to 3-channel RGB to satisfy Keras model requirement
                         img_rgb = mri_img.convert('RGB')
                         
                         # 2. Resize and normalize
                         img_in = np.array(img_rgb.resize((128, 128))).astype("float32") / 255.0
                         img_in = np.expand_dims(img_in, axis=0)
                         
-                        # 3. Get raw prediction (Removed the 1.0 - raw_pred inversion)
-                        ml_score = float(keras_model.predict(img_in, verbose=0)[0][0])
+                        # 3. Get raw prediction from 3-class softmax model (Removed mathematical inversion bug)
+                        preds = keras_model.predict(img_in, verbose=0)[0]
+                        
+                        # Interpret with np.argmax
+                        class_labels = ["Normal", "Cancer", "Malformed"]
+                        idx = np.argmax(preds)
+                        ml_prediction_text = class_labels[idx]
+                        
+                        # If Cancer is expected to be class 1, handle ML logic
+                        ml_score = float(preds[1]) if idx == 1 else 0.0
                         
                     except Exception as e:
                         st.error(f"ML Prediction Error: {e}")
                         ml_score = 0.5
 
-                # ── C. Hybrid decision ────────────────────────
-                final_score = ml_weight * ml_score + cv_weight * cv_score
-                is_tumor    = final_score >= 0.5
-                confidence  = final_score if is_tumor else (1.0 - final_score)
-                confidence  = max(0.60, min(0.99, confidence))
+                # ── C. Hybrid decision (Updated for 3-class) ────────────────────────
+                final_class = ml_prediction_text
+                
+                if final_class == "Cancer":
+                    # If ML says Cancer, combine confidence with CV logic
+                    final_score = ml_weight * ml_score + cv_weight * cv_score
+                    is_tumor = True
+                    confidence = final_score
+                elif final_class == "Malformed":
+                    # For malformed, confidence is just from ML
+                    is_tumor = False
+                    confidence = float(preds[idx]) if 'preds' in locals() and len(preds) > idx else 0.6
+                else: # Normal or Unknown
+                    is_tumor = False
+                    # Normal confidence
+                    confidence = float(preds[0]) if 'preds' in locals() and len(preds) > 0 else 0.8
+                
+                confidence = max(0.60, min(0.99, float(confidence)))
 
                 # Best centroid for localisation
                 centroid = mri_c or xray_c or mwi_c
 
             # ── D. Result banner ───────────────────────────
-            if is_tumor:
+            if final_class == "Cancer":
                 st.markdown(f"""
                 <div class='result-detected'>
-                  <p class='result-title'>🔴 TUMOR DETECTED</p>
+                  <p class='result-title'>🔴 TUMOR (CANCER) DETECTED</p>
                   <p class='result-subtitle'>Multi-modal fusion positive &mdash; clinical correlation required.</p>
+                </div>""", unsafe_allow_html=True)
+            elif final_class == "Malformed":
+                st.markdown(f"""
+                <div class='result-detected' style='background: linear-gradient(90deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05)); border: 1px solid rgba(245,158,11,0.5); border-left: 4px solid #f59e0b;'>
+                  <p class='result-title' style='color:#f59e0b;'>🟠 MALFORMED BRAIN DETECTED</p>
+                  <p class='result-subtitle'>Structural asymmetry detected. Review anomalies.</p>
                 </div>""", unsafe_allow_html=True)
             else:
                 st.markdown(f"""
                 <div class='result-normal'>
-                  <p class='result-title'>🟢 NO TUMOR DETECTED</p>
+                  <p class='result-title'>🟢 NORMAL BRAIN</p>
                   <p class='result-subtitle'>All modalities within normal parameters.</p>
                 </div>""", unsafe_allow_html=True)
 
             m1, m2, m3 = st.columns(3)
-            m1.metric("Classification", "Malignant" if is_tumor else "Normal/Benign")
+            m1.metric("Classification", final_class)
             m2.metric("Confidence",     f"{confidence * 100:.1f}%")
             m3.metric("Modalities",     f"{cv_votes} / 3 positive")
 

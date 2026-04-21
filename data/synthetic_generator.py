@@ -16,28 +16,54 @@ class SyntheticDatasetGenerator:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    def generate_sample(self, sample_id, tumor_pos=None, tumor_radius=None):
-        if tumor_pos is None:
+    def generate_sample(self, sample_id, class_label=None):
+        """
+        class_label: 0 = Normal, 1 = Cancer, 2 = Malformed
+        """
+        if class_label is None:
+            class_label = random.choice([0, 1, 2])
+            
+        mri = np.zeros((128, 128), dtype=np.uint8)
+        xray = np.zeros((128, 128), dtype=np.uint8)
+        mwi = np.zeros((128, 128), dtype=np.uint8)
+
+        # Baseline background
+        mri.fill(random.randint(5, 15))
+        xray.fill(random.randint(2, 8))
+        mwi.fill(random.randint(2, 10))
+
+        if class_label == 0:  # Normal
+            # Standard brain
+            cv2.circle(mri, (64, 64), 50, 40, -1)
+            cv2.rectangle(xray, (20, 20), (108, 108), 80, 2)
+            cv2.circle(mwi, (64, 64), 50, 30, -1)
+            
+        elif class_label == 1:  # Cancer
+            # Standard brain with bright mass
             tumor_pos = (random.randint(35, 93), random.randint(35, 93))
-        if tumor_radius is None:
             tumor_radius = random.randint(7, 14)
+            
+            cv2.circle(mri, (64, 64), 50, 40, -1)
+            cv2.circle(mri, tumor_pos, tumor_radius, 240, -1)
+            
+            cv2.rectangle(xray, (20, 20), (108, 108), 80, 2)
+            cv2.circle(xray, tumor_pos, tumor_radius, 200, -1)
+            
+            cv2.circle(mwi, (64, 64), 50, 30, -1)
+            cv2.circle(mwi, tumor_pos, tumor_radius + 3, 230, -1)
+            
+        elif class_label == 2:  # Malformed
+            # Structurally asymmetrical / shifted phantom
+            shift_x = random.randint(-15, 15)
+            shift_y = random.randint(10, 25)
+            
+            # Asymmetric ellipses and distorted skull
+            cv2.ellipse(mri, (64 + shift_x, 64 + shift_y), (50, 30), random.randint(0, 45), 0, 360, 40, -1)
+            cv2.rectangle(xray, (20 + shift_x, 20), (108, 108 + shift_y), 80, 2)
+            cv2.ellipse(mwi, (64 + shift_x, 64 + shift_y), (50, 30), random.randint(0, 45), 0, 360, 30, -1)
 
-        # 1. Generate MRI-like image (Soft tissue - T2 weighted)
-        mri = np.random.randint(5, 15, (128, 128), dtype=np.uint8)
-        cv2.circle(mri, (64, 64), 50, 40, -1)         # Brain phantom
-        cv2.circle(mri, tumor_pos, tumor_radius, 240, -1)  # Tumor (hyper-intense, >225)
         mri = cv2.GaussianBlur(mri, (3, 3), 0)
-
-        # 2. Generate X-ray-like image (Anatomical/Bone structure)
-        xray = np.random.randint(2, 8, (128, 128), dtype=np.uint8)
-        cv2.rectangle(xray, (20, 20), (108, 108), 80, 2)   # Skull boundary
-        cv2.circle(xray, tumor_pos, tumor_radius, 200, -1)  # Tumor mass
         xray = cv2.GaussianBlur(xray, (3, 3), 0)
-
-        # 3. Generate MWI-like dielectric map
-        mwi = np.random.randint(2, 10, (128, 128), dtype=np.uint8)
-        cv2.circle(mwi, (64, 64), 50, 30, -1)              # Brain background
-        cv2.circle(mwi, tumor_pos, tumor_radius + 3, 230, -1)  # Tumor hotspot (dielectric peak)
         mwi = cv2.GaussianBlur(mwi, (5, 5), 0)
 
         # Save images
@@ -50,8 +76,7 @@ class SyntheticDatasetGenerator:
 
         return {
             'id': sample_id,
-            'tumor_pos': tumor_pos,
-            'tumor_radius': tumor_radius,
+            'class_label': class_label,
             'mri_path': mri_path,
             'xray_path': xray_path,
             'mwi_path': mwi_path,
