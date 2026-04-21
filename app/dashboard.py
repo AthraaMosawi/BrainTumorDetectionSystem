@@ -219,21 +219,35 @@ def fuse_three(mri_gray, xray_gray, mwi_gray, size=(256, 256)):
     fused = np.clip(0.50 * m + 0.25 * x + 0.25 * w, 0, 255).astype(np.uint8)
     return cv2.applyColorMap(fused, cv2.COLORMAP_INFERNO)
 
-def detect_tumor_region(gray_np, threshold=225, min_area=40):
-    """Return (found, max_intensity, bright_pixel_count, centroid)."""
-    max_int   = int(np.max(gray_np))
-    bright_px = int(np.sum(gray_np > threshold))
-    centroid  = None
+def detect_tumor_region(gray_np, fallback_threshold=150, min_area=40):
+    """
+    Dynamically locates tumor regions using Otsu's Thresholding and contour analysis.
+    """
+    max_int = int(np.max(gray_np))
+    blurred = cv2.GaussianBlur(gray_np, (5, 5), 0)
+    
+    # Calculate dynamic threshold using Otsu's Method
+    otsu_val, _ = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    final_threshold = max(otsu_val, fallback_threshold)
+    
+    # Apply mask and count bright pixels
+    _, mask = cv2.threshold(blurred, final_threshold, 255, cv2.THRESH_BINARY)
+    bright_px = int(cv2.countNonZero(mask))
+    
+    centroid = None
+    tumor_found = False
+    
     if bright_px > min_area:
-        mask = (gray_np > threshold).astype(np.uint8) * 255
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
-            c = max(contours, key=cv2.contourArea)
-            M = cv2.moments(c)
-            if M["m00"] != 0:
-                centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-    return (bright_px > min_area), max_int, bright_px, centroid
-
+            largest_contour = max(contours, key=cv2.contourArea)
+            if cv2.contourArea(largest_contour) > min_area:
+                tumor_found = True
+                M = cv2.moments(largest_contour)
+                if M["m00"] != 0:
+                    centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+                
+    return tumor_found, max_int, bright_px, centroid
 def draw_localization(gray_np, centroid, size=(256, 256)):
     """Draw a circle + crosshair over the detected mass."""
     base   = cv2.resize(gray_np, size)
@@ -506,15 +520,22 @@ with col_result:
                 cv_score = cv_votes / 3.0
 
                 # ── B. ML model (Keras) on MRI ─────────────────
+        # ── B. ML model (Keras) on MRI ─────────────────
                 ml_score = 0.5
                 if model_loaded:
                     try:
-                        img_in   = np.array(mri_img.resize((128, 128))).astype("float32") / 255.0
-                        img_in   = np.expand_dims(img_in, axis=0)
-                        raw_pred = float(keras_model.predict(img_in, verbose=0)[0][0])
-                        # Output convention (invert so 1.0 = tumor)
-                        ml_score = 1.0 - raw_pred
-                    except Exception:
+                        # 1. Convert to RGB to satisfy the model's 3-channel requirement
+                        img_rgb = mri_img.convert('RGB')
+                        
+                        # 2. Resize and normalize
+                        img_in = np.array(img_rgb.resize((128, 128))).astype("float32") / 255.0
+                        img_in = np.expand_dims(img_in, axis=0)
+                        
+                        # 3. Get raw prediction (Removed the 1.0 - raw_pred inversion)
+                        ml_score = float(keras_model.predict(img_in, verbose=0)[0][0])
+                        
+                    except Exception as e:
+                        st.error(f"ML Prediction Error: {e}")
                         ml_score = 0.5
 
                 # ── C. Hybrid decision ────────────────────────
