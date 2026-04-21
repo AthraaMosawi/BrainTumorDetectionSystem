@@ -490,18 +490,23 @@ with col_result:
     run_btn = st.button(
         "🔍 Run Multi-Modal Fusion Detection",
         use_container_width=True,
-        disabled=(mri_img is None or xray_img is None),
+        disabled=(mri_img is None),
     )
 
     if run_btn:
-        if mri_img and xray_img:
+        if mri_img:
             with st.spinner("Analyzing with multi-modal fusion…"):
 
                 mri_gray  = pil_to_gray_np(mri_img)
-                xray_gray = pil_to_gray_np(
-                    xray_img if isinstance(xray_img, Image.Image)
-                    else Image.fromarray(xray_img)
-                )
+                if xray_img is not None:
+                    xray_gray = pil_to_gray_np(
+                        xray_img if isinstance(xray_img, Image.Image)
+                        else Image.fromarray(xray_img)
+                    )
+                else:
+                    xray_gray = np.zeros_like(mri_gray)
+                    st.toast("⚠️ No X-Ray provided. Handled gracefully.")
+                
                 mwi_gray = (pil_to_gray_np(mwi_img) if mwi_img
                             else cv2.GaussianBlur(mri_gray, (9, 9), 0))
 
@@ -518,20 +523,24 @@ with col_result:
                 cv_votes = sum([mri_found, xray_found, mwi_found])
                 cv_score = cv_votes / 3.0
 
-                # ── B. ML model (Keras) on MRI ─────────────────
-                # ── B. ML model (Keras) on MRI ─────────────────
+                # ── B. ML model (True Multi-Modal Early Fusion) ────────────────
                 ml_score = 0.0
                 ml_prediction_text = "Unknown"
                 if model_loaded:
                     try:
-                        # 1. Convert grayscale image to 3-channel RGB to satisfy Keras model requirement
-                        img_rgb = mri_img.convert('RGB')
+                        # 1. Resize all 3 grayscale images to 128x128 to match old Sequential Model
+                        mri_img_reshaped = cv2.resize(mri_gray, (128, 128))
+                        xray_img_reshaped = cv2.resize(xray_gray, (128, 128))
+                        mwi_img_reshaped = cv2.resize(mwi_gray, (128, 128))
                         
-                        # 2. Resize and normalize
-                        img_in = np.array(img_rgb.resize((128, 128))).astype("float32") / 255.0
+                        # 2. Stack them into a true 3-Channel Tensor
+                        fused_tensor = np.stack((mri_img_reshaped, xray_img_reshaped, mwi_img_reshaped), axis=-1)
+                        
+                        # 3. Normalize pixels and expand to batch dimension
+                        img_in = (fused_tensor.astype("float32") / 255.0)
                         img_in = np.expand_dims(img_in, axis=0)
                         
-                        # 3. Get raw prediction from 3-class softmax model (Removed mathematical inversion bug)
+                        # 4. Predict using the True Multi-Modal ResNet model
                         preds = keras_model.predict(img_in, verbose=0)[0]
                         
                         # Interpret with np.argmax
@@ -539,7 +548,7 @@ with col_result:
                         idx = np.argmax(preds)
                         ml_prediction_text = class_labels[idx]
                         
-                        # If Cancer is expected to be class 1, handle ML logic
+                        # Set confidence score for hybrid CV fusion logic
                         ml_score = float(preds[1]) if idx == 1 else 0.0
                         
                     except Exception as e:
@@ -548,10 +557,10 @@ with col_result:
 
                 # ── C. Hybrid decision (Updated for 3-class) ────────────────────────
                 final_class = ml_prediction_text
+                final_score = ml_weight * ml_score + cv_weight * cv_score
                 
                 if final_class == "Cancer":
                     # If ML says Cancer, combine confidence with CV logic
-                    final_score = ml_weight * ml_score + cv_weight * cv_score
                     is_tumor = True
                     confidence = final_score
                 elif final_class == "Malformed":
@@ -637,9 +646,9 @@ with col_result:
                 st.write(f"- **ML weight**: {ml_weight:.2f}, **CV weight**: {cv_weight:.2f}")
 
         else:
-            st.error("Please provide at least MRI and X-Ray images to run detection.")
+            st.error("Please provide at least an MRI scan to run detection.")
 
-    elif not run_btn and (mri_img is None or xray_img is None):
+    elif not run_btn and (mri_img is None):
         st.info("Select images from the sidebar and press **Run** to begin analysis.")
 
 
