@@ -325,7 +325,7 @@ if os.path.exists(sample_dir):
         if f.lower().endswith((".jpg", ".jpeg", ".png"))
     ])
 
-_mri_files  = [f for f in _sample_imgs if "mri" in f.lower() or "mre" in f.lower()]
+_mri_files  = [f for f in _sample_imgs if "y" in f.lower() or "no" in f.lower() or "m" in f.lower()]
 _xray_files = [f for f in _sample_imgs if "xray" in f.lower() or "x-ray" in f.lower() or "x_ray" in f.lower()]
 
 with st.sidebar:
